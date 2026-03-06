@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Quarterly Report Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #f7f4ee;
+    --surface:  #ffffff;
+    --ink:      #1a1a1a;
+    --muted:    #888;
+    --border:   #e0ddd6;
+    --blue:     #1a56db;
+    --teal:     #0e9f6e;
+    --amber:    #e3a008;
+    --red:      #e02424;
+    --blue-lt:  #dbeafe;
+    --teal-lt:  #d1fae5;
+    --amber-lt: #fef3c7;
+    --red-lt:   #fee2e2;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: 'DM Mono', monospace;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 0 0 60px;
+  }
+  header {
+    background: var(--ink);
+    color: #fff;
+    padding: 28px 40px 24px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .brand h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .brand p { font-size: 0.7rem; color: #888; letter-spacing: 0.14em; margin-top: 6px; text-transform: uppercase; }
+  .year-tabs { display: flex; gap: 4px; }
+  .year-tabs button {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em;
+    padding: 7px 18px; border: 1px solid #333; border-radius: 3px;
+    background: transparent; color: #888; cursor: pointer; transition: all 0.15s;
+  }
+  .year-tabs button:hover { border-color: #666; color: #ccc; }
+  .year-tabs button.active { background: #fff; color: var(--ink); border-color: #fff; }
+
+  .kpi-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+    border-bottom: 1px solid var(--border); margin-bottom: 32px;
+  }
+  .kpi {
+    background: var(--surface); padding: 24px 28px;
+    opacity: 0; transform: translateY(10px);
+    animation: fadeUp 0.4s ease forwards;
+  }
+  .kpi:nth-child(1){animation-delay:.05s} .kpi:nth-child(2){animation-delay:.12s}
+  .kpi:nth-child(3){animation-delay:.19s} .kpi:nth-child(4){animation-delay:.26s}
+  @keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
+  .kpi-label { font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .kpi-value { font-family:'DM Serif Display',serif; font-size:clamp(1.5rem,3vw,2rem); line-height:1; margin-bottom:8px; }
+  .kpi-delta { font-size:.7rem; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:20px; }
+  .kpi-delta.up   { background:var(--teal-lt);  color:var(--teal); }
+  .kpi-delta.down { background:var(--red-lt);   color:var(--red); }
+  .kpi-delta.flat { background:var(--amber-lt); color:var(--amber); }
+
+  .content { max-width:1100px; margin:0 auto; padding:0 32px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:24px; }
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:4px; padding:24px;
+    opacity:0; animation:fadeUp 0.5s ease forwards;
+  }
+  .card:nth-child(1){animation-delay:.3s} .card:nth-child(2){animation-delay:.4s}
+  .card.full { grid-column:1/-1; animation-delay:.5s; }
+  .card-title {
+    font-size:.65rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:20px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+
+  /* BAR */
+  .bar-chart {
+    display:flex; align-items:flex-end; gap:16px;
+    height:180px; padding-bottom:28px; position:relative;
+  }
+  .bar-chart::before {
+    content:''; position:absolute; bottom:28px; left:0; right:0;
+    border-bottom:1px solid var(--border);
+  }
+  .bar-chart .grid {
+    position:absolute; left:0; right:0;
+    border-top:1px dashed var(--border); pointer-events:none;
+  }
+  .bar-group { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; height:100%; justify-content:flex-end; }
+  .bar-wrap { width:100%; display:flex; gap:3px; align-items:flex-end; height:calc(100% - 20px); }
+  .bar { flex:1; border-radius:2px 2px 0 0; cursor:pointer; transition:filter .15s,transform .15s; transform-origin:bottom; }
+  .bar:hover { filter:brightness(1.1); transform:scaleY(1.03); }
+  .bar.revenue { background:var(--blue); }
+  .bar.profit  { background:var(--teal); }
+  .bar-label { font-size:.62rem; color:var(--muted); letter-spacing:.06em; margin-top:4px; }
+
+  /* DONUT */
+  .donut-wrap { display:flex; align-items:center; gap:28px; }
+  .donut-svg { flex-shrink:0; }
+  .legend-item {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--border);
+    font-size:.72rem; cursor:pointer; transition:opacity .15s;
+  }
+  .legend-item:last-child { border-bottom:none; }
+  .legend-item:hover { opacity:.7; }
+  .legend-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .legend-name { flex:1; }
+  .legend-pct  { color:var(--muted); font-size:.65rem; }
+
+  /* LINE */
+  .line-chart-wrap { position:relative; height:160px; }
+  .line-chart-wrap svg { width:100%; height:100%; overflow:visible; }
+
+  /* TABLE */
+  table { width:100%; border-collapse:collapse; font-size:.75rem; }
+  thead th {
+    text-align:left; font-size:.6rem; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--muted);
+    padding:0 12px 10px 0; border-bottom:2px solid var(--ink);
+  }
+  tbody td { padding:11px 12px 11px 0; border-bottom:1px solid var(--border); vertical-align:middle; }
+  tbody tr:hover td { background:var(--bg); }
+  tbody tr:last-child td { border-bottom:none; }
+  .td-num { text-align:right; font-variant-numeric:tabular-nums; }
+  .mini-bar { height:6px; border-radius:3px; background:var(--blue); transition:width 0.4s ease; }
+
+  /* TOOLTIP */
+  #tooltip {
+    position:fixed; background:var(--ink); color:#fff;
+    font-family:'DM Mono',monospace; font-size:.68rem;
+    padding:8px 12px; border-radius:4px; pointer-events:none;
+    opacity:0; transition:opacity .1s; z-index:100;
+    white-space:nowrap; letter-spacing:.04em;
+  }
+
+  .chart-legend { display:flex; gap:16px; font-size:.65rem; color:var(--muted); }
+  .chart-legend span { display:flex; align-items:center; gap:5px; }
+  .chart-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; }
+
+  @media (max-width:680px) {
+    header { padding:20px; }
+    .kpi-row { grid-template-columns:1fr 1fr; }
+    .grid-2  { grid-template-columns:1fr; }
+    .content { padding:0 16px; }
+    .donut-wrap { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>Quarterly Report</h1>
+    <p>Financial Performance Dashboard</p>
+  </div>
+  <div class="year-tabs">
+    <button data-year="2022">2022</button>
+    <button data-year="2023">2023</button>
+    <button data-year="2024" class="active">2024</button>
+  </div>
+</header>
+
+<div class="kpi-row" id="kpiRow"></div>
+
+<div class="content">
+  <div class="grid-2">
+
+    <div class="card">
+      <div class="card-title">
+        Revenue vs Profit
+        <div class="chart-legend">
+          <span><i style="background:var(--blue)"></i>Revenue</span>
+          <span><i style="background:var(--teal)"></i>Profit</span>
+        </div>
+      </div>
+      <div class="bar-chart" id="barChart"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Revenue Breakdown</div>
+      <div class="donut-wrap">
+        <svg class="donut-svg" id="donutSvg" width="130" height="130" viewBox="0 0 130 130"></svg>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <div class="card-title">
+        Quarterly Trend
+        <div class="chart-legend">
+          <span><i style="background:var(--blue)"></i>Revenue</span>
+          <span><i style="background:var(--amber)"></i>Expenses</span>
+        </div>
+      </div>
+      <div class="line-chart-wrap"><svg id="lineSvg"></svg></div>
+    </div>
+
+    <div class="card full">
+      <div class="card-title">Quarter Breakdown</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Quarter</th>
+            <th class="td-num">Revenue</th>
+            <th class="td-num">Expenses</th>
+            <th class="td-num">Profit</th>
+            <th class="td-num">Margin</th>
+            <th style="width:160px">Performance</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const DATA = {
+  2022: {
+    kpi: { revenue:'$3.2M', profit:'$740K', margin:'23.1%', growth:'+8.4%' },
+    kpiDelta: ['up','up','flat','up'],
+    quarters: [
+      {q:'Q1',revenue:720,expenses:560,profit:160},
+      {q:'Q2',revenue:780,expenses:590,profit:190},
+      {q:'Q3',revenue:840,expenses:630,profit:210},
+      {q:'Q4',revenue:860,expenses:650,profit:210},
+    ],
+    segments: [
+      {name:'Product Sales',pct:45,color:'#1a56db'},
+      {name:'Services',pct:28,color:'#0e9f6e'},
+      {name:'Subscriptions',pct:17,color:'#e3a008'},
+      {name:'Licensing',pct:10,color:'#e02424'},
+    ]
+  },
+  2023: {
+    kpi: { revenue:'$4.1M', profit:'$1.02M', margin:'24.9%', growth:'+28%' },
+    kpiDelta: ['up','up','up','up'],
+    quarters: [
+      {q:'Q1',revenue:880,expenses:660,profit:220},
+      {q:'Q2',revenue:990,expenses:730,profit:260},
+      {q:'Q3',revenue:1070,expenses:790,profit:280},
+      {q:'Q4',revenue:1160,expenses:850,profit:310},
+    ],
+    segments: [
+      {name:'Product Sales',pct:40,color:'#1a56db'},
+      {name:'Services',pct:31,color:'#0e9f6e'},
+      {name:'Subscriptions',pct:20,color:'#e3a008'},
+      {name:'Licensing',pct:9,color:'#e02424'},
+    ]
+  },
+  2024: {
+    kpi: { revenue:'$5.4M', profit:'$1.46M', margin:'27.0%', growth:'+31.7%' },
+    kpiDelta: ['up','up','up','up'],
+    quarters: [
+      {q:'Q1',revenue:1180,expenses:850,profit:330},
+      {q:'Q2',revenue:1320,expenses:940,profit:380},
+      {q:'Q3',revenue:1410,expenses:1010,profit:400},
+      {q:'Q4',revenue:1490,expenses:1040,profit:450},
+    ],
+    segments: [
+      {name:'Product Sales',pct:38,color:'#1a56db'},
+      {name:'Services',pct:33,color:'#0e9f6e'},
+      {name:'Subscriptions',pct:22,color:'#e3a008'},
+      {name:'Licensing',pct:7,color:'#e02424'},
+    ]
+  }
+};
+
+const KPI_LABELS = ['Total Revenue','Net Profit','Profit Margin','YoY Growth'];
+const KPI_KEYS   = ['revenue','profit','margin','growth'];
+const ICONS      = {up:'▲',down:'▼',flat:'→'};
+let activeYear   = 2024;
+
+const tooltip = document.getElementById('tooltip');
+function showTip(e,t){ tooltip.textContent=t; tooltip.style.opacity=1; moveTip(e); }
+function moveTip(e){ tooltip.style.left=(e.clientX+14)+'px'; tooltip.style.top=(e.clientY-28)+'px'; }
+function hideTip(){ tooltip.style.opacity=0; }
+
+function renderKPIs(d){
+  const row = document.getElementById('kpiRow');
+  row.innerHTML = KPI_KEYS.map((k,i)=>`
+    <div class="kpi" style="animation-delay:${0.05+i*0.07}s">
+      <div class="kpi-label">${KPI_LABELS[i]}</div>
+      <div class="kpi-value">${d.kpi[k]}</div>
+      <span class="kpi-delta ${d.kpiDelta[i]}">${ICONS[d.kpiDelta[i]]} vs prev year</span>
+    </div>`).join('');
+}
+
+function renderBar(d){
+  const chart = document.getElementById('barChart');
+  const maxV = Math.max(...d.quarters.map(q=>q.revenue));
+  let html = [0.25,0.5,0.75].map(p=>`<div class="grid" style="bottom:calc(28px + ${p*85}%)"></div>`).join('');
+  html += d.quarters.map(q=>`
+    <div class="bar-group">
+      <div class="bar-wrap">
+        <div class="bar revenue" style="height:${(q.revenue/maxV*100).toFixed(1)}%"
+          onmouseenter="showTip(event,'${q.q} Revenue: $${q.revenue}K')"
+          onmousemove="moveTip(event)" onmouseleave="hideTip()"></div>
+        <div class="bar profit" style="height:${(q.profit/maxV*100).toFixed(1)}%"
+          onmouseenter="showTip(event,'${q.q} Profit: $${q.profit}K')"
+          onmousemove="moveTip(event)" onmouseleave="hideTip()"></div>
+      </div>
+      <div class="bar-label">${q.q}</div>
+    </div>`).join('');
+  chart.innerHTML = html;
+}
+
+function renderDonut(d){
+  const svg = document.getElementById('donutSvg');
+  const leg = document.getElementById('donutLegend');
+  const cx=65,cy=65,R=52,r=32;
+  let angle = -Math.PI/2, paths='';
+  d.segments.forEach(s=>{
+    const sw=(s.pct/100)*Math.PI*2;
+    const x1=cx+R*Math.cos(angle), y1=cy+R*Math.sin(angle);
+    const x2=cx+R*Math.cos(angle+sw), y2=cy+R*Math.sin(angle+sw);
+    const xi1=cx+r*Math.cos(angle+sw), yi1=cy+r*Math.sin(angle+sw);
+    const xi2=cx+r*Math.cos(angle), yi2=cy+r*Math.sin(angle);
+    const lg=sw>Math.PI?1:0;
+    paths+=`<path d="M${x1},${y1} A${R},${R} 0 ${lg},1 ${x2},${y2}
+      L${xi1},${yi1} A${r},${r} 0 ${lg},0 ${xi2},${yi2} Z"
+      fill="${s.color}" opacity="0.9" style="cursor:pointer;transition:opacity .15s"
+      onmouseenter="this.style.opacity=1;showTip(event,'${s.name}: ${s.pct}%')"
+      onmousemove="moveTip(event)" onmouseleave="this.style.opacity=0.9;hideTip()"/>`;
+    angle+=sw;
+  });
+  svg.innerHTML=paths;
+  leg.innerHTML=d.segments.map(s=>`
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${s.color}"></div>
+      <span class="legend-name">${s.name}</span>
+      <span class="legend-pct">${s.pct}%</span>
+    </div>`).join('');
+}
+
+function renderLine(d){
+  const svg = document.getElementById('lineSvg');
+  const W=svg.parentElement.clientWidth||700, H=160;
+  const pad={t:10,r:20,b:30,l:50};
+  const qs=d.quarters;
+  const maxV=Math.max(...qs.map(q=>q.revenue),...qs.map(q=>q.expenses))*1.1;
+  const xs=i=>pad.l+i*(W-pad.l-pad.r)/(qs.length-1);
+  const ys=v=>pad.t+(1-v/maxV)*(H-pad.t-pad.b);
+
+  let grid='';
+  [0,0.25,0.5,0.75,1].forEach(p=>{
+    const y=pad.t+p*(H-pad.t-pad.b), val=Math.round(maxV*(1-p));
+    grid+=`<line x1="${pad.l}" y1="${y}" x2="${W-pad.r}" y2="${y}" stroke="#e0ddd6" stroke-width="1"/>
+      <text x="${pad.l-6}" y="${y+4}" text-anchor="end" font-family="DM Mono,monospace" font-size="9" fill="#888">$${val}K</text>`;
+  });
+  let xlabels=qs.map((q,i)=>`<text x="${xs(i)}" y="${H-4}" text-anchor="middle"
+    font-family="DM Mono,monospace" font-size="10" fill="#888">${q.q}</text>`).join('');
+
+  const line=(key,color,dashed=false)=>{
+    const pts=qs.map((q,i)=>`${xs(i)},${ys(q[key])}`).join(' L ');
+    const dash=dashed?'stroke-dasharray="5,3"':'';
+    const aD=`M${xs(0)},${ys(qs[0][key])} L ${pts} L${xs(qs.length-1)},${H-pad.b} L${xs(0)},${H-pad.b} Z`;
+    return `<path d="${aD}" fill="${color}" opacity="0.07"/>
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.5"
+        stroke-linejoin="round" stroke-linecap="round" ${dash}/>`;
+  };
+  const dots=(key,color)=>qs.map((q,i)=>`
+    <circle cx="${xs(i)}" cy="${ys(q[key])}" r="4" fill="${color}" stroke="#fff" stroke-width="2"
+      style="cursor:pointer"
+      onmouseenter="showTip(event,'${qs[i].q} ${key}: $${q[key]}K')"
+      onmousemove="moveTip(event)" onmouseleave="hideTip()"/>`).join('');
+
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.innerHTML=grid+xlabels+line('revenue','#1a56db')+line('expenses','#e3a008',true)+dots('revenue','#1a56db')+dots('expenses','#e3a008');
+}
+
+function renderTable(d){
+  const maxR=Math.max(...d.quarters.map(q=>q.revenue));
+  document.getElementById('tableBody').innerHTML=d.quarters.map(q=>{
+    const m=((q.profit/q.revenue)*100).toFixed(1);
+    return `<tr>
+      <td><strong>${q.q} ${activeYear}</strong></td>
+      <td class="td-num">$${q.revenue}K</td>
+      <td class="td-num">$${q.expenses}K</td>
+      <td class="td-num">$${q.profit}K</td>
+      <td class="td-num">${m}%</td>
+      <td><div class="mini-bar" style="width:${Math.round(q.revenue/maxR*100)}%"></div></td>
+    </tr>`;
+  }).join('');
+}
+
+function render(year){
+  activeYear=year;
+  const d=DATA[year];
+  renderKPIs(d); renderBar(d); renderDonut(d); renderLine(d); renderTable(d);
+}
+
+document.querySelectorAll('.year-tabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.year-tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    render(+btn.dataset.year);
+  });
+});
+
+render(2024);
+window.addEventListener('resize',()=>renderLine(DATA[activeYear]));
+</script>
+</body>
+</html>
